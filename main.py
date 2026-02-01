@@ -3,14 +3,15 @@ from pathlib import Path
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QCheckBox, QPushButton, QSizePolicy, QScrollArea
+    QCheckBox, QPushButton, QSizePolicy, QScrollArea, 
+    QLineEdit
 )
 from PySide6.QtCore import Qt
 import pickle
 from datetime import datetime
 import os
 
-focusedStretch = 10
+focusedStretch = 5
 unfocusedStretch = 1
 
 DATA_DIR = Path(os.getenv("APPDATA")) / "Cal" #Path("data.pkl")
@@ -34,45 +35,72 @@ def save_tasks(data):
         pickle.dump(data, f)
         
 class TaskWidget(QWidget):
-    def __init__(self, parent, task):
+    def __init__(self, parent, task, day):
         super().__init__()
+        self.parent = parent
+        self.task = task
+        self.day = day
+        
+        task["Widget"] = self
+
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        self.task = task
-        task["Widget"] = self
-        self.parent = parent
-        
-        self.checkbox = QCheckBox(task["Description"])
-        self.checkbox.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+
+        #checkbox
+        self.checkbox = QCheckBox()
         self.checkbox.setChecked(task["Done"])
         self.checkbox.stateChanged.connect(self.updateChecked)
         layout.addWidget(self.checkbox)
+
+        #editable part
+        self.editor = QLineEdit(task["Description"])
+        self.editor.setReadOnly(True)
+        self.editor.setFrame(False)
+        self.editor.editingFinished.connect(self.finishEdit)
         
+        #double click to edit
+        self.editor.mousePressEvent = self.startEdit
+        layout.addWidget(self.editor)
+
         self.updateStylesheet()
-    
-    def updateChecked(self):
-        #set as checked in data
-        self.task["Done"] = self.checkbox.isChecked()
+
+    def startEdit(self, event):
+        self.parent.setFocus(self.day)
+        self.editor.setReadOnly(False)
+        self.editor.setFocus()
+        #self.editor.selectAll()
+
+    def finishEdit(self):
+        self.editor.setReadOnly(True)
         
-        #visually
+        if not self.editor.text().strip():
+            #delete event since its empty
+            self.parent.removeTask(self.task, self.day)
+        else:
+            self.task["Description"] = self.editor.text()
+            self.parent.save()
+
+    def updateChecked(self):
+        self.task["Done"] = self.checkbox.isChecked()
         self.updateStylesheet()
         self.parent.save()
-    
+
     def updateStylesheet(self):
         if self.checkbox.isChecked():
             self.setStyleSheet("""
-                QCheckBox{
-                    background: rgba(255, 182, 193, 5);
+                QLineEdit {
                     color: gray;
+                    background: rgba(255, 182, 193, 5);
                 }
             """)
         else:
             self.setStyleSheet("""
-                QCheckBox{
-                    background: rgba(255, 182, 193, 25);
+                QLineEdit {
                     color: white;
+                    background: rgba(255, 182, 193, 25);
                 }
             """)
+
 
 class WeeklyWidget(QWidget):
     def move_to_screen(self, index):
@@ -113,16 +141,16 @@ class WeeklyWidget(QWidget):
             day_layout.setSpacing(5)
             
             #day label
-            label = QPushButton(day)
+            dayLabel = QPushButton(day)
             if day == TODAY:
-                label.setStyleSheet("font-weight: bold; background: rgba(255, 182, 193, 200);")
+                dayLabel.setStyleSheet("font-weight: bold; background: rgba(255, 182, 193, 200);")
             else:
-                label.setStyleSheet("font-weight: bold;")
-            label.clicked.connect(lambda _, d=day: self.setFocus(d))
-            label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
-            label.setContextMenuPolicy(Qt.CustomContextMenu)
-            label.customContextMenuRequested.connect(lambda _, d=day: self.rightClickDay(d))
-            day_layout.addWidget(label)
+                dayLabel.setStyleSheet("font-weight: bold;")
+            dayLabel.clicked.connect(lambda _, d=day: self.setFocus(d))
+            dayLabel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+            dayLabel.setContextMenuPolicy(Qt.CustomContextMenu)
+            dayLabel.customContextMenuRequested.connect(lambda _, d=day: self.rightClickDay(d))
+            day_layout.addWidget(dayLabel)
 
             #scrollable task area
             task_container = QWidget()
@@ -132,7 +160,7 @@ class WeeklyWidget(QWidget):
             
             #add tasks
             for task in self.tasks[day]:
-                taskCheckbox = TaskWidget(self, task)
+                taskCheckbox = TaskWidget(self, task, day)
                 task_layout.addWidget(taskCheckbox)
             
             #squish things to the top
@@ -190,21 +218,22 @@ class WeeklyWidget(QWidget):
         popup.show()
         
     def clearDay(self, day):
-        print("Clear " + day)
         for task in self.tasks[day]:
-            #visually clear
-            taskWidget = task["Widget"]
-            self.taskLayouts[day].removeWidget(taskWidget)
-            taskWidget.setParent(None)
-            taskWidget.deleteLater()
-            
-            #clear data
-            self.tasks[day] = []
+            self.removeTask(task, day)
         
         self.save()
         
+    def removeTask(self, task, day):
+        #visually clear
+        taskWidget = task["Widget"]
+        self.taskLayouts[day].removeWidget(taskWidget)
+        taskWidget.setParent(None)
+        taskWidget.deleteLater()
+        
+        #clear data
+        self.tasks[day] = []
+        
     def clearWeek(self):
-        print("Clear week")
         for day in DAYS:
             self.clearDay(day)
         
@@ -215,8 +244,10 @@ class WeeklyWidget(QWidget):
             "Done": False
         })
         
-        taskCheckbox = TaskWidget(self, dayTasks[-1])
+        taskCheckbox = TaskWidget(self, dayTasks[-1], day)
         taskLayout = self.taskLayouts[day]
+        
+        #put right above the stretch so it's at the top
         taskLayout.insertWidget(taskLayout.count() - 1, taskCheckbox)
         
         self.save()
@@ -256,7 +287,7 @@ class FloatingPopup(QWidget):
         
         # This is the "background" widget
         bg = QWidget(self)
-        bg.setGeometry(self.rect())  # Fill the whole popup
+        bg.setGeometry(self.rect())
     
         layout = QHBoxLayout(bg)
         layout.setContentsMargins(12, 12, 12, 12)
