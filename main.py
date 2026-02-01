@@ -10,11 +10,32 @@ from PySide6.QtCore import Qt
 import pickle
 from datetime import datetime
 import os
+import shutil
+import psutil
+
+def updateInstanceOnly():
+    current_pid = os.getpid()
+    program_name = os.path.basename(sys.argv[0])
+
+    # Look for other running instances
+    for proc in psutil.process_iter(['pid', 'name', 'exe']):
+        try:
+            # Check if it's the same program but not this process
+            if proc.info['pid'] != current_pid:
+                if proc.info['name'] == program_name or (proc.info['exe'] and os.path.basename(proc.info['exe']) == program_name):
+                    print(f"Found old instance (PID {proc.info['pid']}), terminating it...")
+                    proc.terminate()
+                    proc.wait(timeout=5)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
 
 focusedStretch = 5
 unfocusedStretch = 1
 
-DATA_DIR = Path(os.getenv("APPDATA")) / "Cal" #Path("data.pkl")
+OLD_PATH = Path(os.getenv("APPDATA")) / "Cal"
+OLD_DATA = OLD_PATH / "data.pkl"
+
+DATA_DIR = Path(os.getenv("APPDATA")) / "WidgetCal" #Path("data.pkl")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DATA_FILE = DATA_DIR / "data.pkl"
 
@@ -24,6 +45,11 @@ TODAY = datetime.today().strftime("%a")
 
 #load the tasks to a file
 def load_tasks():
+    #migrate
+    if OLD_DATA.exists():
+        shutil.move(OLD_DATA, DATA_FILE)
+        os.rmdir(OLD_PATH)
+    
     if DATA_FILE.exists():
         with open(DATA_FILE, "rb") as f:
             return pickle.load(f)
@@ -328,7 +354,7 @@ class FloatingPopup(QWidget):
         self.parent.clearDay(self.day)
         self.close()
 
-
+updateInstanceOnly()
 app = QApplication(sys.argv)
 w = WeeklyWidget()
 w.show()
