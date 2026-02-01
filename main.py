@@ -1,6 +1,7 @@
 import sys
 import json
 from pathlib import Path
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QCheckBox, QPushButton, QSizePolicy, QScrollArea
@@ -35,6 +36,19 @@ def save_tasks(data):
         pickle.dump(data, f)
 
 class WeeklyWidget(QWidget):
+    def move_to_screen(self, index):
+        screens = QGuiApplication.screens()
+        index = min(index, len(screens) - 1)
+
+        screen = screens[index]
+        geo = screen.availableGeometry()
+
+        # center on that monitor
+        x = geo.x() + (geo.width() - self.width()) // 2
+        y = geo.y() + (geo.height() - self.height()) // 2
+
+        self.move(x, y)
+    
     def __init__(self):
         super().__init__()
         self.setFixedSize(800, 400)
@@ -46,6 +60,7 @@ class WeeklyWidget(QWidget):
             Qt.WindowStaysOnBottomHint
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
+        self.move_to_screen(0)
         
         layout = QHBoxLayout(self)
         layout.setSpacing(5)
@@ -86,6 +101,7 @@ class WeeklyWidget(QWidget):
                 task_layout.addWidget(taskCheckbox)
                 task["Widget"] = taskCheckbox
             
+            #squish things to the top
             task_layout.addStretch()
             
             scroll = QScrollArea()
@@ -94,8 +110,7 @@ class WeeklyWidget(QWidget):
             scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
             scroll.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
-            #scroll.setFixedWidth(150)  # fixed width for each day column
-            day_layout.addWidget(scroll)    
+            day_layout.addWidget(scroll)
                 
             #button to add a task
             addTaskButton = QPushButton("+")
@@ -153,11 +168,13 @@ class WeeklyWidget(QWidget):
 
         
     def updateChecked(self, checkbox):
+        #set as checked in data
         for day in DAYS:
             for task in self.tasks[day]:
                 if task["Widget"] == checkbox:
                     task["Done"] = checkbox.isChecked()
-                    
+        
+        #visually
         self.updateCheckboxColors(checkbox)
         self.save()
     
@@ -179,6 +196,7 @@ class WeeklyWidget(QWidget):
         taskLayout = self.taskLayouts[day]
         taskCheckbox = QCheckBox("New Task")
         taskCheckbox.setChecked(False)
+        taskCheckbox.stateChanged.connect(lambda _, cb=taskCheckbox: self.updateChecked(cb))
         taskLayout.insertWidget(taskLayout.count() - 1, taskCheckbox)
         
         self.tasks[day].append({
