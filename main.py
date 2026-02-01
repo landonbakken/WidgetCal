@@ -1,16 +1,14 @@
 import sys
-import json
 from pathlib import Path
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QCheckBox, QPushButton, QSizePolicy, QScrollArea
+    QCheckBox, QPushButton, QSizePolicy, QScrollArea
 )
 from PySide6.QtCore import Qt
 import pickle
 from datetime import datetime
 import os
-import copy
 
 focusedStretch = 10
 unfocusedStretch = 1
@@ -34,6 +32,47 @@ def load_tasks():
 def save_tasks(data):
     with open(DATA_FILE, "wb") as f:
         pickle.dump(data, f)
+        
+class TaskWidget(QWidget):
+    def __init__(self, parent, task):
+        super().__init__()
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.task = task
+        task["Widget"] = self
+        self.parent = parent
+        
+        self.checkbox = QCheckBox(task["Description"])
+        self.checkbox.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.checkbox.setChecked(task["Done"])
+        self.checkbox.stateChanged.connect(self.updateChecked)
+        layout.addWidget(self.checkbox)
+        
+        self.updateStylesheet()
+    
+    def updateChecked(self):
+        #set as checked in data
+        self.task["Done"] = self.checkbox.isChecked()
+        
+        #visually
+        self.updateStylesheet()
+        self.parent.save()
+    
+    def updateStylesheet(self):
+        if self.checkbox.isChecked():
+            self.setStyleSheet("""
+                QCheckBox{
+                    background: rgba(255, 182, 193, 5);
+                    color: gray;
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                QCheckBox{
+                    background: rgba(255, 182, 193, 25);
+                    color: white;
+                }
+            """)
 
 class WeeklyWidget(QWidget):
     def move_to_screen(self, index):
@@ -51,7 +90,7 @@ class WeeklyWidget(QWidget):
     
     def __init__(self):
         super().__init__()
-        self.setFixedSize(800, 400)
+        self.setFixedSize(1000, 400)
         self.taskLayouts = {}
         self.tasks = load_tasks()
         self.setWindowFlags(
@@ -93,13 +132,8 @@ class WeeklyWidget(QWidget):
             
             #add tasks
             for task in self.tasks[day]:
-                taskCheckbox = QCheckBox(task["Description"])
-                taskCheckbox.setChecked(task["Done"])
-                self.updateCheckboxColors(taskCheckbox)
-                taskCheckbox.stateChanged.connect(lambda _, cb=taskCheckbox: self.updateChecked(cb))
-                taskCheckbox.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+                taskCheckbox = TaskWidget(self, task)
                 task_layout.addWidget(taskCheckbox)
-                task["Widget"] = taskCheckbox
             
             #squish things to the top
             task_layout.addStretch()
@@ -108,7 +142,7 @@ class WeeklyWidget(QWidget):
             scroll.setWidgetResizable(True)
             scroll.setWidget(task_container)
             scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-            scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             scroll.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
             day_layout.addWidget(scroll)
                 
@@ -124,17 +158,25 @@ class WeeklyWidget(QWidget):
             layout.addWidget(dayWidget)
             
             self.setFocus(TODAY)
-
+        
         self.setStyleSheet("""
             QWidget {
-                background: rgba(255, 182, 193, 25);
+                background: rgba(255, 182, 193, 0);
                 color: white;
                 border-radius: 12px;
-                padding: 10px;
+                padding: 5px;
             }
             
             QPushButton:hover {
-                background: rgba(255, 182, 193, 60);
+                background: rgba(255, 182, 193, 80);
+            }
+            
+            QPushButton {
+                background: rgba(255, 182, 193, 50);
+            }
+            
+            QScrollArea{
+                background: rgba(255, 182, 193, 50);
             }
         """)
         
@@ -165,46 +207,18 @@ class WeeklyWidget(QWidget):
         print("Clear week")
         for day in DAYS:
             self.clearDay(day)
-
-        
-    def updateChecked(self, checkbox):
-        #set as checked in data
-        for day in DAYS:
-            for task in self.tasks[day]:
-                if task["Widget"] == checkbox:
-                    task["Done"] = checkbox.isChecked()
-        
-        #visually
-        self.updateCheckboxColors(checkbox)
-        self.save()
-    
-    def updateCheckboxColors(self, checkbox):
-        if checkbox.isChecked():
-            checkbox.setStyleSheet("""
-                background: rgba(255, 182, 193, 5);
-                color: gray;
-            }
-            """)
-        else:
-            checkbox.setStyleSheet("""
-                background: rgba(255, 182, 193, 25);
-                color: white;
-            }
-            """)
         
     def addTask(self, day):
+        dayTasks = self.tasks[day]
+        dayTasks.append({
+            "Description": "New Task",
+            "Done": False
+        })
+        
+        taskCheckbox = TaskWidget(self, dayTasks[-1])
         taskLayout = self.taskLayouts[day]
-        taskCheckbox = QCheckBox("New Task")
-        taskCheckbox.setChecked(False)
-        taskCheckbox.stateChanged.connect(lambda _, cb=taskCheckbox: self.updateChecked(cb))
         taskLayout.insertWidget(taskLayout.count() - 1, taskCheckbox)
         
-        self.tasks[day].append({
-            "Description": "New Task",
-            "Done": False,
-            "Widget": taskCheckbox
-        })
-        self
         self.save()
         self.setFocus(day)
         
