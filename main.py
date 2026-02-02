@@ -96,7 +96,7 @@ class TaskWidget(QWidget):
         #editable part
         self.editor = QLineEdit(task["Description"])
         self.editor.setReadOnly(True)
-        #self.editor.setCursorPosition(0)
+        self.editor.setCursorPosition(0)
         self.editor.setFrame(False)
         self.editor.editingFinished.connect(self.finishEdit)
         
@@ -112,12 +112,12 @@ class TaskWidget(QWidget):
     def startEdit(self, event=None):
         self.parent.setFocus(self.day)
         self.editor.setReadOnly(False)
-        #self.editor.setCursorPosition(len(self.editor.text()))
+        self.editor.setCursorPosition(len(self.editor.text()))
         self.editor.setFocus()
 
     def finishEdit(self):
         self.editor.setReadOnly(True)
-        #self.editor.setCursorPosition(0)
+        self.editor.setCursorPosition(0)
         
         if not self.editor.text().strip():
             #delete event since its empty
