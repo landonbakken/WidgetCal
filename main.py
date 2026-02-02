@@ -155,16 +155,18 @@ class WeeklyWidget(QWidget):
 
         screen = screens[index]
         geo = screen.availableGeometry()
+        
+        #size
+        self.resize(geo.width(), geo.height()*2/3)
 
-        # center on that monitor
+        # center on screen
         x = geo.x() + (geo.width() - self.width()) // 2
-        y = geo.y() + (geo.height() - self.height()) // 2
+        y = 0#geo.y() + (geo.height() - self.height()) // 2
 
         self.move(x, y)
     
     def __init__(self):
         super().__init__()
-        self.setFixedSize(1000, 400)
         self.taskLayouts = {}
         self.tasks = load_tasks()
         self.setWindowFlags(
@@ -189,21 +191,9 @@ class WeeklyWidget(QWidget):
             #day label
             dayLabel = QPushButton(day)
             if day == TODAY:
-                dayLabel.setStyleSheet(f"""
-                    QPushButton{{
-                        font-weight: bold; 
-                        background: rgba({HIGHLIGHTED_STRONG}); 
-                        color: rgba({LABEL_TEXT});
-                    }}
-                """)
+                dayLabel.setProperty("role", "dayLabel_today")
             else:
-                dayLabel.setStyleSheet(f"""
-                    QPushButton{{
-                        font-weight: bold; 
-                        background: rgba({BACKGROUND}); 
-                        color: rgba({LABEL_TEXT});
-                    }}
-                """)
+                dayLabel.setProperty("role", "dayLabel")
             dayLabel.clicked.connect(lambda _, d=day: self.setFocus(d))
             dayLabel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
             dayLabel.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -261,13 +251,24 @@ class WeeklyWidget(QWidget):
                 color: rgba({LABEL_TEXT});
             }}
             
+            QPushButton[role="dayLabel"]{{
+                font-weight: bold;
+            }}
+            
+            QPushButton[role="dayLabel_today"]{{
+                font-weight: bold;
+                background: rgba({HIGHLIGHTED_STRONG})
+            }}
+            
             QScrollArea{{
                 background: rgba({BACKGROUND});
             }}
+            
             QLineEdit {{
                 color: {UNCHECKED_TEXT};
                 background: rgba({CLEAR});
             }}
+            
             QCheckBox {{
                 color: {UNCHECKED_TEXT};
                 background: rgba({CLEAR});
@@ -275,6 +276,7 @@ class WeeklyWidget(QWidget):
                 padding: 1px;
                 margin: 0px;
             }}
+            
             QCheckBox::indicator {{
                 margin: 0px;
                 padding: 0px;
