@@ -44,7 +44,7 @@ DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 TODAY = datetime.today().strftime("%a")
 
 BASE_COLOR = "150, 80, 70"
-SECONDARY_COLOR = "180, 100, 100"
+SECONDARY_COLOR = "230, 160, 150"
 CLEAR = "0, 0, 0, 0"
 BACKGROUND = BASE_COLOR + ", 50"
 HIGHLIGHTED_WEAK = BASE_COLOR + ", 90"
