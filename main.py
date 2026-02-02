@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QCheckBox, QPushButton, QSizePolicy, QScrollArea, 
     QLineEdit
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 import pickle
 from datetime import datetime
 import os
@@ -43,6 +43,14 @@ DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 TODAY = datetime.today().strftime("%a")
 
+BASE_COLOR = "255, 182, 193"
+BACKGROUND = BASE_COLOR + ", 50"
+HIGHLIGHTED_WEAK = BASE_COLOR + ", 70"
+HIGHLIGHTED_STRONG = BASE_COLOR + ", 90"
+CHECKED = BASE_COLOR + ", 20"
+CHECKED_TEXT = "gray"
+UNCHECKED_TEXT = "black"
+
 #load the tasks to a file
 def load_tasks():
     #migrate
@@ -71,6 +79,7 @@ class TaskWidget(QWidget):
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
         #checkbox
         self.checkbox = QCheckBox()
@@ -81,23 +90,28 @@ class TaskWidget(QWidget):
         #editable part
         self.editor = QLineEdit(task["Description"])
         self.editor.setReadOnly(True)
+        #self.editor.setCursorPosition(0)
         self.editor.setFrame(False)
         self.editor.editingFinished.connect(self.finishEdit)
         
-        #double click to edit
+        #click to edit
         self.editor.mousePressEvent = self.startEdit
         layout.addWidget(self.editor)
 
         self.updateStylesheet()
+        
+        if task["Description"] == "":
+            QTimer.singleShot(0, self.startEdit)
 
-    def startEdit(self, event):
+    def startEdit(self, event=None):
         self.parent.setFocus(self.day)
         self.editor.setReadOnly(False)
+        #self.editor.setCursorPosition(len(self.editor.text()))
         self.editor.setFocus()
-        #self.editor.selectAll()
 
     def finishEdit(self):
         self.editor.setReadOnly(True)
+        #self.editor.setCursorPosition(0)
         
         if not self.editor.text().strip():
             #delete event since its empty
@@ -113,19 +127,19 @@ class TaskWidget(QWidget):
 
     def updateStylesheet(self):
         if self.checkbox.isChecked():
-            self.setStyleSheet("""
-                QLineEdit {
-                    color: gray;
-                    background: rgba(255, 182, 193, 5);
-                }
+            self.setStyleSheet(f"""
+                QLineEdit {{
+                    color: {CHECKED_TEXT};
+                    background: rgba({CHECKED});
+                }}
+                QCheckBox {{
+                    color: {CHECKED_TEXT};
+                    background: rgba({CHECKED});
+                }}
             """)
         else:
-            self.setStyleSheet("""
-                QLineEdit {
-                    color: white;
-                    background: rgba(255, 182, 193, 25);
-                }
-            """)
+            #just use the inharited one
+            self.setStyleSheet("")
 
 
 class WeeklyWidget(QWidget):
@@ -169,7 +183,7 @@ class WeeklyWidget(QWidget):
             #day label
             dayLabel = QPushButton(day)
             if day == TODAY:
-                dayLabel.setStyleSheet("font-weight: bold; background: rgba(255, 182, 193, 200);")
+                dayLabel.setStyleSheet(f"font-weight: bold; background: rgba({HIGHLIGHTED_STRONG});")
             else:
                 dayLabel.setStyleSheet("font-weight: bold;")
             dayLabel.clicked.connect(lambda _, d=day: self.setFocus(d))
@@ -213,25 +227,32 @@ class WeeklyWidget(QWidget):
             
             self.setFocus(TODAY)
         
-        self.setStyleSheet("""
-            QWidget {
-                background: rgba(255, 182, 193, 0);
-                color: white;
+        self.setStyleSheet(f"""
+            QWidget {{
+                background: rgba(0, 0, 0, 0);
                 border-radius: 12px;
                 padding: 5px;
-            }
+            }}
             
-            QPushButton:hover {
-                background: rgba(255, 182, 193, 80);
-            }
+            QPushButton:hover {{
+                background: rgba({HIGHLIGHTED_WEAK});
+            }}
             
-            QPushButton {
-                background: rgba(255, 182, 193, 50);
-            }
+            QPushButton {{
+                background: rgba({BACKGROUND});
+            }}
             
-            QScrollArea{
-                background: rgba(255, 182, 193, 50);
-            }
+            QScrollArea{{
+                background: rgba({BACKGROUND});
+            }}
+            QLineEdit {{
+                color: {UNCHECKED_TEXT};
+                background: rgba({BACKGROUND});
+            }}
+            QCheckBox {{
+                color: {UNCHECKED_TEXT};
+                background: rgba({BACKGROUND});
+            }}
         """)
         
     def rightClickDay(self, day):
@@ -266,7 +287,7 @@ class WeeklyWidget(QWidget):
     def addTask(self, day):
         dayTasks = self.tasks[day]
         dayTasks.append({
-            "Description": "New Task",
+            "Description": "",
             "Done": False
         })
         
@@ -311,7 +332,7 @@ class FloatingPopup(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setFixedSize(300, 50)
         
-        # This is the "background" widget
+        #background
         bg = QWidget(self)
         bg.setGeometry(self.rect())
     
