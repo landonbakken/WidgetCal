@@ -43,13 +43,19 @@ DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 TODAY = datetime.today().strftime("%a")
 
-BASE_COLOR = "255, 182, 193"
+BASE_COLOR = "150, 80, 70"
+SECONDARY_COLOR = "180, 100, 100"
+CLEAR = "0, 0, 0, 0"
 BACKGROUND = BASE_COLOR + ", 50"
-HIGHLIGHTED_WEAK = BASE_COLOR + ", 70"
-HIGHLIGHTED_STRONG = BASE_COLOR + ", 90"
+HIGHLIGHTED_WEAK = BASE_COLOR + ", 90"
+HIGHLIGHTED_STRONG = BASE_COLOR + ", 150"
 CHECKED = BASE_COLOR + ", 20"
+POPUP_BACKGROUND = BASE_COLOR + ", 200"
+POPUP_BUTTON = SECONDARY_COLOR + ", 50"
+POPUP_BUTTON_HIGHLIGHT = SECONDARY_COLOR + ", 90"
 CHECKED_TEXT = "gray"
-UNCHECKED_TEXT = "black"
+UNCHECKED_TEXT = "white"
+LABEL_TEXT = "black"
 
 #load the tasks to a file
 def load_tasks():
@@ -183,9 +189,21 @@ class WeeklyWidget(QWidget):
             #day label
             dayLabel = QPushButton(day)
             if day == TODAY:
-                dayLabel.setStyleSheet(f"font-weight: bold; background: rgba({HIGHLIGHTED_STRONG});")
+                dayLabel.setStyleSheet(f"""
+                    QPushButton{{
+                        font-weight: bold; 
+                        background: rgba({HIGHLIGHTED_STRONG}); 
+                        color: rgba({LABEL_TEXT});
+                    }}
+                """)
             else:
-                dayLabel.setStyleSheet("font-weight: bold;")
+                dayLabel.setStyleSheet(f"""
+                    QPushButton{{
+                        font-weight: bold; 
+                        background: rgba({BACKGROUND}); 
+                        color: rgba({LABEL_TEXT});
+                    }}
+                """)
             dayLabel.clicked.connect(lambda _, d=day: self.setFocus(d))
             dayLabel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
             dayLabel.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -229,7 +247,7 @@ class WeeklyWidget(QWidget):
         
         self.setStyleSheet(f"""
             QWidget {{
-                background: rgba(0, 0, 0, 0);
+                background: rgba({CLEAR});
                 border-radius: 12px;
                 padding: 5px;
             }}
@@ -240,6 +258,7 @@ class WeeklyWidget(QWidget):
             
             QPushButton {{
                 background: rgba({BACKGROUND});
+                color: rgba({LABEL_TEXT});
             }}
             
             QScrollArea{{
@@ -247,11 +266,18 @@ class WeeklyWidget(QWidget):
             }}
             QLineEdit {{
                 color: {UNCHECKED_TEXT};
-                background: rgba({BACKGROUND});
+                background: rgba({CLEAR});
             }}
             QCheckBox {{
                 color: {UNCHECKED_TEXT};
-                background: rgba({BACKGROUND});
+                background: rgba({CLEAR});
+                spacing: 0px;
+                padding: 1px;
+                margin: 0px;
+            }}
+            QCheckBox::indicator {{
+                margin: 0px;
+                padding: 0px;
             }}
         """)
         
@@ -352,19 +378,19 @@ class FloatingPopup(QWidget):
         layout.addWidget(clearDay)
         layout.addWidget(cancel)
 
-        self.setStyleSheet("""
-            QWidget{
-                background: rgba(100, 60, 70, 255);
-                border-radius: 14px;
-            }
-            QPushButton {
-                background: rgba(255, 182, 193, 160);
+        self.setStyleSheet(f"""
+            QWidget{{
+                background: rgba({POPUP_BACKGROUND});
+                border-radius: 10px;
+            }}
+            QPushButton {{
+                background: rgba({POPUP_BUTTON});
                 border-radius: 8px;
                 padding: 6px;
-            }
-            QPushButton:hover {
-                background: rgba(255, 182, 193, 220);
-            }
+            }}
+            QPushButton:hover {{
+                background: rgba({POPUP_BUTTON_HIGHLIGHT});
+            }}
         """)
         
     def clearWeek(self):
