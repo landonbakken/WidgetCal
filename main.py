@@ -1,10 +1,10 @@
 import sys
 from pathlib import Path
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QTextOption
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QCheckBox, QPushButton, QSizePolicy, QScrollArea, 
-    QLineEdit
+    QLineEdit, QTextEdit
 )
 from PySide6.QtCore import Qt, QTimer
 import pickle
@@ -29,15 +29,20 @@ def updateInstanceOnly():
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
 
-focusedStretch = 5
+focusedStretch = 2
 unfocusedStretch = 1
 
+#data paths
+DATA_DIR = Path(os.getenv("APPDATA")) / "WidgetCal"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+TASK_FILE = DATA_DIR / "tasks.pkl"
+NOTE_FILE = DATA_DIR / "notes.pkl"
+
+#things to migrate from
 OLD_PATH = Path(os.getenv("APPDATA")) / "Cal"
 OLD_DATA = OLD_PATH / "data.pkl"
-
-DATA_DIR = Path(os.getenv("APPDATA")) / "WidgetCal" #Path("data.pkl")
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-DATA_FILE = DATA_DIR / "data.pkl"
+TASK_FILE_OLD_NAME = DATA_DIR / "data.pkl"
 
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
@@ -61,18 +66,61 @@ LABEL_TEXT = "black"
 def load_tasks():
     #migrate
     if OLD_DATA.exists():
-        shutil.move(OLD_DATA, DATA_FILE)
+        shutil.move(OLD_DATA, TASK_FILE)
         os.rmdir(OLD_PATH)
+    if TASK_FILE_OLD_NAME.exists():
+        shutil.move(TASK_FILE_OLD_NAME, TASK_FILE)
     
-    if DATA_FILE.exists():
-        with open(DATA_FILE, "rb") as f:
+    #parse data
+    if TASK_FILE.exists():
+        with open(TASK_FILE, "rb") as f:
             return pickle.load(f)
     return {day: [] for day in DAYS}
 
-#save the tasks to a file
+def load_notes():
+    if NOTE_FILE.exists():
+        with open(NOTE_FILE, "rb") as f:
+            return pickle.load(f)
+    return {day: "" for day in DAYS}
+
+#saveTasks the tasks to a file
 def save_tasks(data):
-    with open(DATA_FILE, "wb") as f:
+    with open(TASK_FILE, "wb") as f:
         pickle.dump(data, f)
+
+def save_notes(data):
+    with open(NOTE_FILE, "wb") as f:
+        pickle.dump(data, f)
+        
+class NoteWidget(QWidget):
+    def __init__(self, parent, day, text):
+        super().__init__()
+
+        self.parent = parent
+        self.day = day
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        self.editor = QTextEdit()
+        self.editor.setAcceptRichText(False)   # plain text only
+        self.editor.setWordWrapMode(QTextOption.WordWrap)
+        self.editor.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.editor.setPlainText(text)
+        
+        self.editor.focusInEvent = self.startEditing
+        self.editor.focusOutEvent = self.endEditing
+
+        layout.addWidget(self.editor)
+        
+    def startEditing(self, event):
+        self.parent.setFocus(self.day)
+        QTextEdit.focusInEvent(self.editor, event)
+        
+    def endEditing(self, event):
+        self.parent.notes[self.day] = self.editor.toPlainText()
+        self.parent.saveNotes()
+        QTextEdit.focusOutEvent(self.editor, event)
         
 class TaskWidget(QWidget):
     def __init__(self, parent, task, day):
@@ -124,12 +172,12 @@ class TaskWidget(QWidget):
             self.parent.removeTask(self.task, self.day)
         else:
             self.task["Description"] = self.editor.text()
-            self.parent.save()
+            self.parent.saveTasks()
 
     def updateChecked(self):
         self.task["Done"] = self.checkbox.isChecked()
         self.updateStylesheet()
-        self.parent.save()
+        self.parent.saveTasks()
 
     def updateStylesheet(self):
         if self.checkbox.isChecked():
@@ -169,6 +217,7 @@ class WeeklyWidget(QWidget):
         super().__init__()
         self.taskLayouts = {}
         self.tasks = load_tasks()
+        self.notes = load_notes()
         self.setWindowFlags(
             Qt.FramelessWindowHint |
             Qt.Tool |
@@ -220,7 +269,7 @@ class WeeklyWidget(QWidget):
             scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             scroll.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
-            day_layout.addWidget(scroll)
+            day_layout.addWidget(scroll, 1)
                 
             #button to add a task
             addTaskButton = QPushButton("+")
@@ -231,6 +280,9 @@ class WeeklyWidget(QWidget):
             #reference for modifications
             self.taskLayouts[day] = task_layout
             
+            notes = NoteWidget(self, day, self.notes[day])
+            day_layout.addWidget(notes, 1)
+            
             layout.addWidget(dayWidget)
             
             self.setFocus(TODAY)
@@ -240,6 +292,10 @@ class WeeklyWidget(QWidget):
                 background: rgba({CLEAR});
                 border-radius: 12px;
                 padding: 5px;
+            }}
+            
+            QTextEdit{{
+                background: rgba({BACKGROUND});
             }}
             
             QPushButton:hover {{
@@ -296,7 +352,7 @@ class WeeklyWidget(QWidget):
         for task in self.tasks[day]:
             self.removeTask(task, day)
         
-        self.save()
+        self.saveTasks()
         
     def removeTask(self, task, day):
         #visually clear
@@ -325,7 +381,7 @@ class WeeklyWidget(QWidget):
         #put right above the stretch so it's at the top
         taskLayout.insertWidget(taskLayout.count() - 1, taskCheckbox)
         
-        self.save()
+        self.saveTasks()
         self.setFocus(day)
         
     def setFocus(self, day):
@@ -335,7 +391,7 @@ class WeeklyWidget(QWidget):
         
         self.layout().setStretch(dayIndex, focusedStretch)
     
-    def save(self):
+    def saveTasks(self):
         tasksToSave = {day: [] for day in DAYS}
         for day in DAYS:
             for task in self.tasks[day]:
@@ -344,7 +400,9 @@ class WeeklyWidget(QWidget):
                     "Done": task["Done"]
                 })
         save_tasks(tasksToSave)
-                
+    
+    def saveNotes(self):
+        save_notes(self.notes)
 
 class FloatingPopup(QWidget):
     def __init__(self, parent, day):
