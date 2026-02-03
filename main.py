@@ -12,6 +12,7 @@ from datetime import datetime
 import os
 import shutil
 import psutil
+import json
 
 def updateInstanceOnly():
     current_pid = os.getpid()
@@ -38,6 +39,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 TASK_FILE = DATA_DIR / "tasks.pkl"
 NOTE_FILE = DATA_DIR / "notes.pkl"
+CONFIG_FILE = DATA_DIR / "config.json"
 
 #things to migrate from
 OLD_PATH = Path(os.getenv("APPDATA")) / "Cal"
@@ -48,19 +50,23 @@ DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 TODAY = datetime.today().strftime("%a")
 
-BASE_COLOR = "150, 80, 70"
-SECONDARY_COLOR = "230, 160, 150"
+with open(CONFIG_FILE, "r") as file:
+    config = json.load(file)
+
+BASE_COLOR = config["BASE_COLOR"] + ", " + config["ALPHA"]
+SECONDARY_COLOR = config["SECONDARY_COLOR"] + ", " + config["ALPHA"]
+
 CLEAR = "0, 0, 0, 0"
-BACKGROUND = BASE_COLOR + ", 50"
-HIGHLIGHTED_WEAK = BASE_COLOR + ", 90"
-HIGHLIGHTED_STRONG = BASE_COLOR + ", 150"
-CHECKED = BASE_COLOR + ", 20"
-POPUP_BACKGROUND = BASE_COLOR + ", 200"
-POPUP_BUTTON = SECONDARY_COLOR + ", 50"
-POPUP_BUTTON_HIGHLIGHT = SECONDARY_COLOR + ", 90"
-CHECKED_TEXT = "gray"
-UNCHECKED_TEXT = "white"
-LABEL_TEXT = "black"
+BACKGROUND = BASE_COLOR
+HIGHLIGHTED_WEAK = BASE_COLOR
+HIGHLIGHTED_STRONG = BASE_COLOR
+CHECKED = BASE_COLOR
+POPUP_BACKGROUND = BASE_COLOR
+POPUP_BUTTON = SECONDARY_COLOR
+POPUP_BUTTON_HIGHLIGHT = SECONDARY_COLOR
+CHECKED_TEXT = config["CHECKED_TEXT"]
+UNCHECKED_TEXT = config["UNCHECKED_TEXT"]
+LABEL_TEXT = config["LABEL_TEXT"]
 
 #load the tasks to a file
 def load_tasks():
@@ -304,7 +310,7 @@ class WeeklyWidget(QWidget):
             
             QPushButton {{
                 background: rgba({BACKGROUND});
-                color: rgba({LABEL_TEXT});
+                color: {LABEL_TEXT};
             }}
             
             QPushButton[role="dayLabel"]{{
