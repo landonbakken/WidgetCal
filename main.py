@@ -50,6 +50,18 @@ DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 TODAY = datetime.today().strftime("%a")
 
+if not CONFIG_FILE.exists():
+    defualtConfig = {
+        "BASE_COLOR": "255, 230, 248",
+        "SECONDARY_COLOR": "230, 160, 150",
+        "CHECKED_TEXT": "gray",
+        "UNCHECKED_TEXT": "black",
+        "LABEL_TEXT": "black",
+        "ALPHA": "255"
+    }
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(defualtConfig, f)
+
 with open(CONFIG_FILE, "r") as file:
     config = json.load(file)
 
