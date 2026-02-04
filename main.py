@@ -4,15 +4,16 @@ from PySide6.QtGui import QGuiApplication, QTextOption
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QCheckBox, QPushButton, QSizePolicy, QScrollArea, 
-    QLineEdit, QTextEdit
+    QLineEdit, QTextEdit, QGridLayout
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QFileSystemWatcher
 import pickle
 from datetime import datetime
 import os
 import shutil
 import psutil
 import json
+
 
 def updateInstanceOnly():
     current_pid = os.getpid()
@@ -47,38 +48,32 @@ OLD_DATA = OLD_PATH / "data.pkl"
 TASK_FILE_OLD_NAME = DATA_DIR / "data.pkl"
 
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+CLEAR = "0, 0, 0, 0"
 
 TODAY = datetime.today().strftime("%a")
 
-if not CONFIG_FILE.exists():
-    defualtConfig = {
-        "BASE_COLOR": "255, 230, 248",
-        "SECONDARY_COLOR": "230, 160, 150",
-        "CHECKED_TEXT": "gray",
-        "UNCHECKED_TEXT": "black",
-        "LABEL_TEXT": "black",
-        "ALPHA": "255"
-    }
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(defualtConfig, f)
+def loadConfig():
+    global config
+    
+    if not CONFIG_FILE.exists():
+        defualtConfig = {
+            "BASE_COLOR": "224, 123, 201",
+            "SECONDARY_COLOR": "230, 160, 150",
+            "CHECKED_TEXT": "gray",
+            "UNCHECKED_TEXT": "black",
+            "LABEL_TEXT": "black",
+            "ALPHA": "75",
+            "LEFT_MARGIN": 30,
+            "RIGHT_MARGIN": 30,
+            "TOP_MARGIN": 30,
+            "BOTTOM_MARGIN": 200,
+            "DEFAULT_SCREEN": 0
+        }
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(defualtConfig, f, indent=4)
 
-with open(CONFIG_FILE, "r") as file:
-    config = json.load(file)
-
-BASE_COLOR = config["BASE_COLOR"] + ", " + config["ALPHA"]
-SECONDARY_COLOR = config["SECONDARY_COLOR"] + ", " + config["ALPHA"]
-
-CLEAR = "0, 0, 0, 0"
-BACKGROUND = BASE_COLOR
-HIGHLIGHTED_WEAK = BASE_COLOR
-HIGHLIGHTED_STRONG = BASE_COLOR
-CHECKED = BASE_COLOR
-POPUP_BACKGROUND = BASE_COLOR
-POPUP_BUTTON = SECONDARY_COLOR
-POPUP_BUTTON_HIGHLIGHT = SECONDARY_COLOR
-CHECKED_TEXT = config["CHECKED_TEXT"]
-UNCHECKED_TEXT = config["UNCHECKED_TEXT"]
-LABEL_TEXT = config["LABEL_TEXT"]
+    with open(CONFIG_FILE, "r") as file:
+        config = json.load(file)
 
 #load the tasks to a file
 def load_tasks():
@@ -201,12 +196,12 @@ class TaskWidget(QWidget):
         if self.checkbox.isChecked():
             self.setStyleSheet(f"""
                 QLineEdit {{
-                    color: {CHECKED_TEXT};
-                    background: rgba({CHECKED});
+                    color: rgba({config("CHECKED_TEXT")});
+                    background: rgba({config("CHECKED_BACKGROUND")});
                 }}
                 QCheckBox {{
-                    color: {CHECKED_TEXT};
-                    background: rgba({CHECKED});
+                    color: rgba({config("CHECKED_TEXT")});
+                    background: rgba({config("CHECKED_BACKGROUND")});
                 }}
             """)
         else:
@@ -215,22 +210,6 @@ class TaskWidget(QWidget):
 
 
 class WeeklyWidget(QWidget):
-    def move_to_screen(self, index):
-        screens = QGuiApplication.screens()
-        index = min(index, len(screens) - 1)
-
-        screen = screens[index]
-        geo = screen.availableGeometry()
-        
-        #size
-        self.resize(geo.width(), geo.height()*2/3)
-
-        # center on screen
-        x = geo.x() + (geo.width() - self.width()) // 2
-        y = 0#geo.y() + (geo.height() - self.height()) // 2
-
-        self.move(x, y)
-    
     def __init__(self):
         super().__init__()
         self.taskLayouts = {}
@@ -242,7 +221,6 @@ class WeeklyWidget(QWidget):
             Qt.WindowStaysOnBottomHint
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.move_to_screen(0)
         
         layout = QHBoxLayout(self)
         layout.setSpacing(5)
@@ -266,6 +244,10 @@ class WeeklyWidget(QWidget):
             dayLabel.setContextMenuPolicy(Qt.CustomContextMenu)
             dayLabel.customContextMenuRequested.connect(lambda _, d=day: self.rightClickDay(d))
             day_layout.addWidget(dayLabel)
+            
+            
+            notes = NoteWidget(self, day, self.notes[day])
+            day_layout.addWidget(notes, 1)
 
             #scrollable task area
             task_container = QWidget()
@@ -294,17 +276,49 @@ class WeeklyWidget(QWidget):
             addTaskButton.clicked.connect(lambda _, d=day: self.addTask(d))
             addTaskButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
             day_layout.addWidget(addTaskButton)
+            addTaskButton.setProperty("role", "addTask")
 
             #reference for modifications
             self.taskLayouts[day] = task_layout
             
-            notes = NoteWidget(self, day, self.notes[day])
-            day_layout.addWidget(notes, 1)
-            
             layout.addWidget(dayWidget)
             
             self.setFocus(TODAY)
+            
+    def updatePos(self):
+        screens = QGuiApplication.screens()
+        screenIndex = min(config["DEFAULT_SCREEN"], len(screens) - 1)
+
+        screen = screens[screenIndex]
+        geo = screen.availableGeometry()
         
+        height = geo.height() - config["TOP_MARGIN"] - config["BOTTOM_MARGIN"]
+        width = geo.width() - config["LEFT_MARGIN"] - config["RIGHT_MARGIN"]
+        
+        #size
+        self.resize(width, height)
+
+        # center on screen
+        x = config["LEFT_MARGIN"]
+        y = config["TOP_MARGIN"]
+
+        self.move(x, y)
+    
+    def updateConfig(self):
+        #screenPos
+        self.updatePos()
+        self.updateStylesheet()
+        
+        for day in DAYS:
+            for task in self.tasks[day]:
+                task["Widget"].updateStylesheet()
+    
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.updateConfig()
+    
+    def updateStylesheet(self):
+        #actual stylesheet
         self.setStyleSheet(f"""
             QWidget {{
                 background: rgba({CLEAR});
@@ -313,38 +327,43 @@ class WeeklyWidget(QWidget):
             }}
             
             QTextEdit{{
-                background: rgba({BACKGROUND});
+                background: rgba({config["BACKGROUND"]});
+                color: rgba({config["NOTES_TEXT"]});
             }}
             
             QPushButton:hover {{
-                background: rgba({HIGHLIGHTED_WEAK});
+                background: rgba({config["HIGHLIGHT"]});
             }}
             
-            QPushButton {{
-                background: rgba({BACKGROUND});
-                color: {LABEL_TEXT};
+            QPushButton[role="addTask"] {{
+                background: rgba({config["BACKGROUND"]});
+                color: rgba({config["ADD_TASK_TEXT"]});
+                font-weight: bold;
             }}
             
             QPushButton[role="dayLabel"]{{
                 font-weight: bold;
+                color: rgba({config["DAY_LABEL_TEXT"]});
+                background: rgba({config["BACKGROUND"]})
             }}
             
             QPushButton[role="dayLabel_today"]{{
                 font-weight: bold;
-                background: rgba({HIGHLIGHTED_STRONG})
+                color: rgba({config["DAY_LABEL_TEXT"]});
+                background: rgba({config["DAY_LABEL_TODAY_BACKGROUND"]})
             }}
             
             QScrollArea{{
-                background: rgba({BACKGROUND});
+                background: rgba({config["BACKGROUND"]});
             }}
             
             QLineEdit {{
-                color: {UNCHECKED_TEXT};
+                color: rgba({config["UNCHECKED_TEXT"]});
                 background: rgba({CLEAR});
             }}
             
             QCheckBox {{
-                color: {UNCHECKED_TEXT};
+                color: {config["UNCHECKED_TEXT"]};
                 background: rgba({CLEAR});
                 spacing: 0px;
                 padding: 1px;
@@ -434,40 +453,43 @@ class FloatingPopup(QWidget):
             Qt.WindowStaysOnTopHint
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setFixedSize(300, 50)
+        self.setFixedSize(300, 125)
         
         #background
         bg = QWidget(self)
         bg.setGeometry(self.rect())
     
-        layout = QHBoxLayout(bg)
+        layout = QGridLayout(bg)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
 
         clearWeek = QPushButton("Clear Week")
         clearDay = QPushButton("Clear Day")
+        updateConfig = QPushButton("Update Config")
         cancel = QPushButton("Close")
 
         cancel.clicked.connect(self.close)
         clearWeek.clicked.connect(self.clearWeek)
         clearDay.clicked.connect(self.clearDay)
+        updateConfig.clicked.connect(self.updateConfig)
 
-        layout.addWidget(clearWeek)
-        layout.addWidget(clearDay)
-        layout.addWidget(cancel)
-
+        layout.addWidget(clearWeek, 0, 0)
+        layout.addWidget(clearDay, 0, 1)
+        layout.addWidget(cancel, 1, 0)
+        layout.addWidget(updateConfig, 1, 1)
+    
         self.setStyleSheet(f"""
             QWidget{{
-                background: rgba({POPUP_BACKGROUND});
+                background: rgba({config["POPUP_BACKGROUND"]});
                 border-radius: 10px;
             }}
             QPushButton {{
-                background: rgba({POPUP_BUTTON});
+                background: rgba({config["POPUP_BUTTON"]});
                 border-radius: 8px;
                 padding: 6px;
             }}
             QPushButton:hover {{
-                background: rgba({POPUP_BUTTON_HIGHLIGHT});
+                background: rgba({config["POPUP_BUTTON_HIGHLIGHT"]});
             }}
         """)
         
@@ -478,8 +500,24 @@ class FloatingPopup(QWidget):
     def clearDay(self):
         self.parent.clearDay(self.day)
         self.close()
+        
+    def updateConfig(self):
+        loadConfig()
+        w.updateConfig()
+        self.close()
 
 updateInstanceOnly()
+loadConfig()
+
+watcher = QFileSystemWatcher()
+watcher.addPath(str(CONFIG_FILE))
+
+def on_config_changed(path):
+    loadConfig()
+    w.updateConfig()
+
+watcher.fileChanged.connect(on_config_changed)
+
 app = QApplication(sys.argv)
 w = WeeklyWidget()
 w.show()
