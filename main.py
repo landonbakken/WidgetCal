@@ -14,7 +14,6 @@ import shutil
 import psutil
 import json
 
-
 def updateInstanceOnly():
     current_pid = os.getpid()
     program_name = os.path.basename(sys.argv[0])
@@ -38,14 +37,13 @@ unfocusedStretch = 1
 DATA_DIR = Path(os.getenv("APPDATA")) / "WidgetCal"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-TASK_FILE = DATA_DIR / "tasks.pkl"
-NOTE_FILE = DATA_DIR / "notes.pkl"
+TASK_FILE = DATA_DIR / "tasks.json"
+NOTE_FILE = DATA_DIR / "notes.json"
 CONFIG_FILE = DATA_DIR / "config.json"
 
 #things to migrate from
-OLD_PATH = Path(os.getenv("APPDATA")) / "Cal"
-OLD_DATA = OLD_PATH / "data.pkl"
-TASK_FILE_OLD_NAME = DATA_DIR / "data.pkl"
+OLD_TASK_FILE = DATA_DIR / "tasks.pkl"
+OLD_NOTE_FILE = DATA_DIR / "notes.pkl"
 
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 CLEAR = "0, 0, 0, 0"
@@ -57,17 +55,29 @@ def loadConfig():
     
     if not CONFIG_FILE.exists():
         defualtConfig = {
-            "BASE_COLOR": "224, 123, 201",
-            "SECONDARY_COLOR": "230, 160, 150",
-            "CHECKED_TEXT": "gray",
-            "UNCHECKED_TEXT": "black",
-            "LABEL_TEXT": "black",
-            "ALPHA": "75",
-            "LEFT_MARGIN": 30,
-            "RIGHT_MARGIN": 30,
-            "TOP_MARGIN": 30,
-            "BOTTOM_MARGIN": 200,
-            "DEFAULT_SCREEN": 0
+                "BACKGROUND": "224, 123, 201, 75",
+                "HIGHLIGHT": "224, 123, 201, 120",
+                
+                "CHECKED_TEXT": "30, 30, 30, 255",
+                "UNCHECKED_TEXT": "0, 0, 0, 255",
+                "CHECKED_BACKGROUND": "224, 123, 201, 20",
+                
+                "DAY_LABEL_TODAY_BACKGROUND": "230, 160, 150, 75",
+
+                "DAY_LABEL_TEXT": "0, 0, 0, 255",
+                "ADD_TASK_TEXT": "0, 0, 0, 255",
+                "NOTES_TEXT": "0, 0, 0, 255",
+
+                "POPUP_BACKGROUND": "200, 130, 120, 255",
+                "POPUP_BUTTON": "230, 160, 150, 75",
+                "POPUP_BUTTON_HIGHLIGHT": "230, 160, 150, 130",
+
+                "LEFT_MARGIN": 30,
+                "RIGHT_MARGIN": 300,
+                "TOP_MARGIN": 30,
+                "BOTTOM_MARGIN": 600,
+
+                "DEFAULT_SCREEN": 0
         }
         with open(CONFIG_FILE, "w") as f:
             json.dump(defualtConfig, f, indent=4)
@@ -78,32 +88,41 @@ def loadConfig():
 #load the tasks to a file
 def load_tasks():
     #migrate
-    if OLD_DATA.exists():
-        shutil.move(OLD_DATA, TASK_FILE)
-        os.rmdir(OLD_PATH)
-    if TASK_FILE_OLD_NAME.exists():
-        shutil.move(TASK_FILE_OLD_NAME, TASK_FILE)
+    if OLD_TASK_FILE.exists():
+        with open(OLD_TASK_FILE, "rb") as f:
+            data = pickle.load(f)
+            save_tasks(data)
+        os.remove(OLD_TASK_FILE)
     
     #parse data
     if TASK_FILE.exists():
         with open(TASK_FILE, "rb") as f:
-            return pickle.load(f)
+            return json.load(f)
+        
+    #nothing exists
     return {day: [] for day in DAYS}
 
 def load_notes():
+    #migrate
+    if OLD_NOTE_FILE.exists():
+        with open(OLD_NOTE_FILE, "rb") as f:
+            data = pickle.load(f)
+            save_notes(data)
+        os.remove(OLD_NOTE_FILE)
+    
     if NOTE_FILE.exists():
         with open(NOTE_FILE, "rb") as f:
-            return pickle.load(f)
+            return json.load(f)
     return {day: "" for day in DAYS}
 
 #saveTasks the tasks to a file
 def save_tasks(data):
-    with open(TASK_FILE, "wb") as f:
-        pickle.dump(data, f)
+    with open(TASK_FILE, "w") as f:
+        json.dump(data, f, indent=4)
 
 def save_notes(data):
-    with open(NOTE_FILE, "wb") as f:
-        pickle.dump(data, f)
+    with open(NOTE_FILE, "w") as f:
+        json.dump(data, f, indent=4)
         
 class NoteWidget(QWidget):
     def __init__(self, parent, day, text):
@@ -471,12 +490,10 @@ class FloatingPopup(QWidget):
         cancel.clicked.connect(self.close)
         clearWeek.clicked.connect(self.clearWeek)
         clearDay.clicked.connect(self.clearDay)
-        updateConfig.clicked.connect(self.updateConfig)
 
         layout.addWidget(clearWeek, 0, 0)
         layout.addWidget(clearDay, 0, 1)
         layout.addWidget(cancel, 1, 0)
-        layout.addWidget(updateConfig, 1, 1)
     
         self.setStyleSheet(f"""
             QWidget{{
@@ -500,22 +517,15 @@ class FloatingPopup(QWidget):
     def clearDay(self):
         self.parent.clearDay(self.day)
         self.close()
-        
-    def updateConfig(self):
-        loadConfig()
-        w.updateConfig()
-        self.close()
 
 updateInstanceOnly()
 loadConfig()
 
 watcher = QFileSystemWatcher()
 watcher.addPath(str(CONFIG_FILE))
-
 def on_config_changed(path):
     loadConfig()
     w.updateConfig()
-
 watcher.fileChanged.connect(on_config_changed)
 
 app = QApplication(sys.argv)
