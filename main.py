@@ -156,13 +156,13 @@ class NoteWidget(QWidget):
         QTextEdit.focusOutEvent(self.editor, event)
         
 class TaskWidget(QWidget):
-    def __init__(self, parent, task, day):
+    def __init__(self, parent, description, done, day):
         super().__init__()
         self.parent = parent
-        self.task = task
-        self.day = day
+        self.description = description
+        self.done = done
         
-        task["Widget"] = self
+        self.day = day
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -170,12 +170,12 @@ class TaskWidget(QWidget):
 
         #checkbox
         self.checkbox = QCheckBox()
-        self.checkbox.setChecked(task["Done"])
+        self.checkbox.setChecked(self.done)
         self.checkbox.stateChanged.connect(self.updateChecked)
         layout.addWidget(self.checkbox)
 
         #editable part
-        self.editor = QLineEdit(task["Description"])
+        self.editor = QLineEdit(self.description)
         self.editor.setReadOnly(True)
         self.editor.setCursorPosition(0)
         self.editor.setFrame(False)
@@ -191,8 +191,8 @@ class TaskWidget(QWidget):
 
         self.updateStylesheet()
         
-        if task["Description"] == "":
-            QTimer.singleShot(0, self.startEdit)
+        #if self.description == "":
+        #    QTimer.singleShot(0, self.startEdit)
 
     def startEdit(self, event=None):
         self.parent.setFocus(self.day)
@@ -203,11 +203,11 @@ class TaskWidget(QWidget):
     def finishEdit(self):
         self.editor.setReadOnly(True)
         self.editor.setCursorPosition(0)
-        self.task["Description"] = self.editor.text()
+        self.description = self.editor.text()
         self.parent.saveTasks()
     
     def deleteTask(self):
-        self.parent.removeTask(self.task, self.day)
+        self.parent.removeTask(self, self.day)
 
     def updateChecked(self):
         self.task["Done"] = self.checkbox.isChecked()
@@ -229,13 +229,21 @@ class TaskWidget(QWidget):
         else:
             #just use the inharited one
             self.setStyleSheet("")
+            
+    def toData(self):
+        data = {
+            "Description": self.description,
+            "Done": self.done
+        }
+        
+        return data
 
 
 class WeeklyWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.taskLayouts = {}
-        self.tasks = load_tasks()
+        self.taskDatas = load_tasks()
         self.notes = load_notes()
         self.setWindowFlags(
             Qt.FramelessWindowHint |
@@ -247,6 +255,7 @@ class WeeklyWidget(QWidget):
         layout = QHBoxLayout(self)
         layout.setSpacing(5)
 
+        self.tasks = {day: [] for day in DAYS}
         for day in DAYS:
             #vbox for each day
             dayWidget = QWidget()
@@ -278,9 +287,10 @@ class WeeklyWidget(QWidget):
             task_layout.setSpacing(2)
             
             #add tasks
-            for task in self.tasks[day]:
-                taskCheckbox = TaskWidget(self, task, day)
-                task_layout.addWidget(taskCheckbox)
+            for taskData in self.taskDatas[day]:
+                task = TaskWidget(self, taskData["Description"], taskData["Done"], day)
+                self.tasks[day].append(task)
+                task_layout.addWidget(task)
             
             #squish things to the top
             task_layout.addStretch()
@@ -333,7 +343,7 @@ class WeeklyWidget(QWidget):
         
         for day in DAYS:
             for task in self.tasks[day]:
-                task["Widget"].updateStylesheet()
+                task.updateStylesheet()
     
     def showEvent(self, event):
         super().showEvent(event)
@@ -415,13 +425,12 @@ class WeeklyWidget(QWidget):
         
     def removeTask(self, task, day):
         #visually clear
-        taskWidget = task["Widget"]
-        self.taskLayouts[day].removeWidget(taskWidget)
-        taskWidget.setParent(None)
-        taskWidget.deleteLater()
+        self.taskLayouts[day].removeWidget(task)
+        task.setParent(None)
+        task.deleteLater()
         
         #clear data
-        self.tasks[day] = []
+        self.tasks[day].remove(task)
         
         self.saveTasks()
         
@@ -430,18 +439,14 @@ class WeeklyWidget(QWidget):
             self.clearDay(day)
         
     def addTask(self, day):
-        dayTasks = self.tasks[day]
-        dayTasks.append({
-            "Description": "",
-            "Done": False
-        })
-        
-        taskCheckbox = TaskWidget(self, dayTasks[-1], day)
-        taskLayout = self.taskLayouts[day]
+        task = TaskWidget(self, "", False, day)
+        self.tasks[day].append(task)
         
         #put right above the stretch so it's at the top
-        taskLayout.insertWidget(taskLayout.count() - 1, taskCheckbox)
+        taskLayout = self.taskLayouts[day]
+        taskLayout.insertWidget(taskLayout.count() - 1, task)
         
+        #update
         self.saveTasks()
         self.setFocus(day)
         
@@ -456,10 +461,8 @@ class WeeklyWidget(QWidget):
         tasksToSave = {day: [] for day in DAYS}
         for day in DAYS:
             for task in self.tasks[day]:
-                tasksToSave[day].append({
-                    "Description": task["Description"],
-                    "Done": task["Done"]
-                })
+                data = task.toData()
+                tasksToSave[day].append(data)
         save_tasks(tasksToSave)
     
     def saveNotes(self):
