@@ -48,42 +48,57 @@ OLD_NOTE_FILE = DATA_DIR / "notes.pkl"
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 CLEAR = "0, 0, 0, 0"
 
+DEFAULT_CONFIG = {
+    "BACKGROUND": "224, 123, 201, 75",
+    "HIGHLIGHT": "224, 123, 201, 120",
+    
+    "CHECKED_TEXT": "30, 30, 30, 255",
+    "UNCHECKED_TEXT": "0, 0, 0, 255",
+    "CHECKED_BACKGROUND": "224, 123, 201, 20",
+    
+    "DAY_LABEL_TODAY_BACKGROUND": "230, 160, 150, 75",
+
+    "DAY_LABEL_TEXT": "0, 0, 0, 255",
+    "ADD_TASK_TEXT": "0, 0, 0, 255",
+    "NOTES_TEXT": "0, 0, 0, 255",
+
+    "POPUP_BACKGROUND": "200, 130, 120, 255",
+    "POPUP_BUTTON": "230, 160, 150, 75",
+    "POPUP_BUTTON_HIGHLIGHT": "230, 160, 150, 130",
+
+    "LEFT_MARGIN": 30,
+    "RIGHT_MARGIN": 300,
+    "TOP_MARGIN": 30,
+    "BOTTOM_MARGIN": 600,
+
+    "DEFAULT_SCREEN": 0
+}
+
 TODAY = datetime.today().strftime("%a")
 
 def loadConfig():
     global config
     
+    #create
     if not CONFIG_FILE.exists():
-        defualtConfig = {
-                "BACKGROUND": "224, 123, 201, 75",
-                "HIGHLIGHT": "224, 123, 201, 120",
-                
-                "CHECKED_TEXT": "30, 30, 30, 255",
-                "UNCHECKED_TEXT": "0, 0, 0, 255",
-                "CHECKED_BACKGROUND": "224, 123, 201, 20",
-                
-                "DAY_LABEL_TODAY_BACKGROUND": "230, 160, 150, 75",
-
-                "DAY_LABEL_TEXT": "0, 0, 0, 255",
-                "ADD_TASK_TEXT": "0, 0, 0, 255",
-                "NOTES_TEXT": "0, 0, 0, 255",
-
-                "POPUP_BACKGROUND": "200, 130, 120, 255",
-                "POPUP_BUTTON": "230, 160, 150, 75",
-                "POPUP_BUTTON_HIGHLIGHT": "230, 160, 150, 130",
-
-                "LEFT_MARGIN": 30,
-                "RIGHT_MARGIN": 300,
-                "TOP_MARGIN": 30,
-                "BOTTOM_MARGIN": 600,
-
-                "DEFAULT_SCREEN": 0
-        }
         with open(CONFIG_FILE, "w") as f:
-            json.dump(defualtConfig, f, indent=4)
+            json.dump(DEFAULT_CONFIG, f, indent=4)
 
+    #read
     with open(CONFIG_FILE, "r") as file:
         config = json.load(file)
+        
+    #check config
+    for key in DEFAULT_CONFIG.keys():
+        if not key in config.keys():
+            #add missing value
+            config[key] = DEFAULT_CONFIG[key]
+            
+            #re-save
+            with open(CONFIG_FILE, "w") as file:
+                json.dump(config, file, indent=4)
+                
+            print("Added", key, "to the config")
 
 #load the tasks to a file
 def load_tasks():
