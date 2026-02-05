@@ -117,6 +117,7 @@ def load_notes():
 
 #saveTasks the tasks to a file
 def save_tasks(data):
+    print(data)
     with open(TASK_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
@@ -183,6 +184,10 @@ class TaskWidget(QWidget):
         #click to edit
         self.editor.mousePressEvent = self.startEdit
         layout.addWidget(self.editor)
+        
+        self.deleteButton = QPushButton("X")
+        self.deleteButton.clicked.connect(self.deleteTask)
+        layout.addWidget(self.deleteButton)
 
         self.updateStylesheet()
         
@@ -198,13 +203,11 @@ class TaskWidget(QWidget):
     def finishEdit(self):
         self.editor.setReadOnly(True)
         self.editor.setCursorPosition(0)
-        
-        if not self.editor.text().strip():
-            #delete event since its empty
-            self.parent.removeTask(self.task, self.day)
-        else:
-            self.task["Description"] = self.editor.text()
-            self.parent.saveTasks()
+        self.task["Description"] = self.editor.text()
+        self.parent.saveTasks()
+    
+    def deleteTask(self):
+        self.parent.removeTask(self.task, self.day)
 
     def updateChecked(self):
         self.task["Done"] = self.checkbox.isChecked()
@@ -215,12 +218,12 @@ class TaskWidget(QWidget):
         if self.checkbox.isChecked():
             self.setStyleSheet(f"""
                 QLineEdit {{
-                    color: rgba({config("CHECKED_TEXT")});
-                    background: rgba({config("CHECKED_BACKGROUND")});
+                    color: rgba({config["CHECKED_TEXT"]});
+                    background: rgba({config["CHECKED_BACKGROUND"]});
                 }}
                 QCheckBox {{
-                    color: rgba({config("CHECKED_TEXT")});
-                    background: rgba({config("CHECKED_BACKGROUND")});
+                    color: rgba({config["CHECKED_TEXT"]});
+                    background: rgba({config["CHECKED_BACKGROUND"]});
                 }}
             """)
         else:
@@ -419,6 +422,8 @@ class WeeklyWidget(QWidget):
         
         #clear data
         self.tasks[day] = []
+        
+        self.saveTasks()
         
     def clearWeek(self):
         for day in DAYS:
