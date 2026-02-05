@@ -117,7 +117,6 @@ def load_notes():
 
 #saveTasks the tasks to a file
 def save_tasks(data):
-    print(data)
     with open(TASK_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
@@ -156,7 +155,7 @@ class NoteWidget(QWidget):
         QTextEdit.focusOutEvent(self.editor, event)
         
 class TaskWidget(QWidget):
-    def __init__(self, parent, description, done, day):
+    def __init__(self, parent, description, done, day, new=False):
         super().__init__()
         self.parent = parent
         self.description = description
@@ -191,8 +190,8 @@ class TaskWidget(QWidget):
 
         self.updateStylesheet()
         
-        #if self.description == "":
-        #    QTimer.singleShot(0, self.startEdit)
+        if new:
+            QTimer.singleShot(0, self.startEdit)
 
     def startEdit(self, event=None):
         self.parent.setFocus(self.day)
@@ -439,7 +438,7 @@ class WeeklyWidget(QWidget):
             self.clearDay(day)
         
     def addTask(self, day):
-        task = TaskWidget(self, "", False, day)
+        task = TaskWidget(self, "", False, day, True)
         self.tasks[day].append(task)
         
         #put right above the stretch so it's at the top
