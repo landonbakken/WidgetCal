@@ -515,6 +515,12 @@ class WeeklyWidget(QWidget):
     
     def saveNotes(self):
         save_notes(self.notes)
+        
+    def hideEvent(self, event):
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        super().hideEvent(event)
 
 class FloatingPopup(QWidget):
     def __init__(self, parent, day):
