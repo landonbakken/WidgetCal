@@ -88,7 +88,7 @@ def loadConfig():
     with open(CONFIG_FILE, "r") as file:
         config = json.load(file)
         
-    #check config
+    #add missing keys
     for key in DEFAULT_CONFIG.keys():
         if not key in config.keys():
             #add missing value
@@ -99,6 +99,20 @@ def loadConfig():
                 json.dump(config, file, indent=4)
                 
             print("Added", key, "to the config")
+            
+    #remove useless keys
+    # keys = config.keys().copy()
+    # for key in keys:
+    #     if not key in DEFAULT_CONFIG.keys():
+    #         #remove useless value
+    #         del config[key]
+            
+    #         #re-save
+    #         with open(CONFIG_FILE, "w") as file:
+    #             json.dump(config, file, indent=4)
+                
+    #         print("removed", key, "from the config")
+            
 
 #load the tasks to a file
 def load_tasks():
@@ -224,7 +238,7 @@ class TaskWidget(QWidget):
         self.parent.removeTask(self, self.day)
 
     def updateChecked(self):
-        self.task["Done"] = self.checkbox.isChecked()
+        self.done = self.checkbox.isChecked()
         self.updateStylesheet()
         self.parent.saveTasks()
 
