@@ -10,7 +10,6 @@ from PySide6.QtCore import Qt, QTimer, QFileSystemWatcher
 import pickle
 from datetime import datetime
 import os
-import shutil
 import psutil
 import json
 
@@ -29,9 +28,6 @@ def updateInstanceOnly():
                     proc.wait(timeout=5)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
-
-focusedStretch = 2
-unfocusedStretch = 1
 
 #data paths
 DATA_DIR = Path(os.getenv("APPDATA")) / "WidgetCal"
@@ -70,6 +66,8 @@ DEFAULT_CONFIG = {
     "RIGHT_MARGIN": 300,
     "TOP_MARGIN": 30,
     "BOTTOM_MARGIN": 600,
+    "FOCUSED_SCALE": 2,
+    "NOTES_TASKS_RATIO": 1,
 
     "DEFAULT_SCREEN": 0
 }
@@ -306,23 +304,13 @@ class WeeklyWidget(QWidget):
             
             
             notes = NoteWidget(self, day, self.notes[day])
-            day_layout.addWidget(notes, 1)
+            day_layout.addWidget(notes, config["NOTES_TASKS_RATIO"])
 
             #scrollable task area
             task_container = QWidget()
             task_layout = QVBoxLayout(task_container)
             task_layout.setContentsMargins(0, 0, 0, 0)
             task_layout.setSpacing(2)
-            
-            #add tasks
-            for taskData in self.taskDatas[day]:
-                task = TaskWidget(self, taskData["Description"], taskData["Done"], day)
-                self.tasks[day].append(task)
-                task_layout.addWidget(task)
-            
-            #squish things to the top
-            task_layout.addStretch()
-            
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             scroll.setWidget(task_container)
@@ -372,9 +360,25 @@ class WeeklyWidget(QWidget):
         for day in DAYS:
             for task in self.tasks[day]:
                 task.updateStylesheet()
+                
+    def addExistingTasks(self):
+        #add tasks
+        for day in DAYS:
+            #get referenc to layout 
+            taskLayout = self.taskLayouts[day]
+            
+            #add each task
+            for taskData in self.taskDatas[day]:
+                task = TaskWidget(self, taskData["Description"], taskData["Done"], day)
+                self.tasks[day].append(task)
+                taskLayout.addWidget(task)
+            
+            #squish things to the top
+            taskLayout.addStretch()
     
     def showEvent(self, event):
         super().showEvent(event)
+        self.addExistingTasks()
         self.updateConfig()
     
     def updateStylesheet(self):
@@ -481,9 +485,9 @@ class WeeklyWidget(QWidget):
     def setFocus(self, day):
         dayIndex = DAYS.index(day)
         for i in range(len(DAYS)):
-            self.layout().setStretch(i, unfocusedStretch)
+            self.layout().setStretch(i, 1)
         
-        self.layout().setStretch(dayIndex, focusedStretch)
+        self.layout().setStretch(dayIndex, config["FOCUSED_SCALE"])
     
     def saveTasks(self):
         tasksToSave = {day: [] for day in DAYS}
