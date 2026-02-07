@@ -4,7 +4,7 @@ from PySide6.QtGui import QGuiApplication, QTextOption
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QCheckBox, QPushButton, QSizePolicy, QScrollArea, 
-    QLineEdit, QTextEdit, QGridLayout
+    QLineEdit, QTextEdit, QGridLayout, QFrame
 )
 from PySide6.QtCore import Qt, QTimer, QFileSystemWatcher
 import pickle
@@ -50,6 +50,7 @@ DEFAULT_CONFIG = {
     
     "CHECKED_TEXT": "30, 30, 30, 255",
     "UNCHECKED_TEXT": "0, 0, 0, 255",
+    "UNCHECKED_BACKGROUND": "224, 123, 201, 75",
     "CHECKED_BACKGROUND": "224, 123, 201, 20",
     
     "DAY_LABEL_TODAY_BACKGROUND": "230, 160, 150, 75",
@@ -98,18 +99,25 @@ def loadConfig():
                 
             print("Added", key, "to the config")
             
-    #remove useless keys
-    # keys = config.keys().copy()
-    # for key in keys:
-    #     if not key in DEFAULT_CONFIG.keys():
-    #         #remove useless value
-    #         del config[key]
+    #show unused keys
+    keys = list(config.keys()).copy()
+
+    if "unused" not in keys:
+        config["unused"] = {}
+    
+    for key in keys:
+        if not key in DEFAULT_CONFIG.keys() and not key == "unused":
+            #move to the unused catagory
+            config["unused"][key] = config[key]
             
-    #         #re-save
-    #         with open(CONFIG_FILE, "w") as file:
-    #             json.dump(config, file, indent=4)
+            #remove
+            del config[key]
+            
+            #re-save
+            with open(CONFIG_FILE, "w") as file:
+                json.dump(config, file, indent=4)
                 
-    #         print("removed", key, "from the config")
+            print("removed", key, "from the config")
             
 
 #load the tasks to a file
@@ -195,12 +203,18 @@ class TaskWidget(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        
+        frame = QFrame()
+        frameLayout = QHBoxLayout(frame)
+        frameLayout.setContentsMargins(0, 0, 0, 0)
+        frameLayout.setSpacing(0)
+        layout.addWidget(frame)
 
         #checkbox
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(self.done)
         self.checkbox.stateChanged.connect(self.updateChecked)
-        layout.addWidget(self.checkbox)
+        frameLayout.addWidget(self.checkbox)
 
         #editable part
         self.editor = QLineEdit(self.description)
@@ -211,11 +225,11 @@ class TaskWidget(QWidget):
         
         #click to edit
         self.editor.mousePressEvent = self.startEdit
-        layout.addWidget(self.editor)
+        frameLayout.addWidget(self.editor)
         
         self.deleteButton = QPushButton("X")
         self.deleteButton.clicked.connect(self.deleteTask)
-        layout.addWidget(self.deleteButton)
+        frameLayout.addWidget(self.deleteButton)
 
         self.updateStylesheet()
         
@@ -245,18 +259,36 @@ class TaskWidget(QWidget):
     def updateStylesheet(self):
         if self.checkbox.isChecked():
             self.setStyleSheet(f"""
-                QLineEdit {{
-                    color: rgba({config["CHECKED_TEXT"]});
+                QFrame{{
                     background: rgba({config["CHECKED_BACKGROUND"]});
+                    color: rgba({config["CHECKED_TEXT"]});
                 }}
                 QCheckBox {{
-                    color: rgba({config["CHECKED_TEXT"]});
-                    background: rgba({config["CHECKED_BACKGROUND"]});
+                    spacing: 0px;
+                    padding: 1px;
+                    margin: 0px;
+                }}
+                QCheckBox::indicator {{
+                    margin: 0px;
+                    padding: 0px;
                 }}
             """)
         else:
-            #just use the inharited one
-            self.setStyleSheet("")
+            self.setStyleSheet(f"""
+                QFrame{{
+                    background: rgba({config["UNCHECKED_BACKGROUND"]});
+                    color: rgba({config["UNCHECKED_TEXT"]});
+                }}
+                QCheckBox {{
+                    spacing: 0px;
+                    padding: 1px;
+                    margin: 0px;
+                }}
+                QCheckBox::indicator {{
+                    margin: 0px;
+                    padding: 0px;
+                }}                  
+            """)
             
     def toData(self):
         data = {
@@ -421,24 +453,6 @@ class WeeklyWidget(QWidget):
             
             QScrollArea{{
                 background: rgba({config["BACKGROUND"]});
-            }}
-            
-            QLineEdit {{
-                color: rgba({config["UNCHECKED_TEXT"]});
-                background: rgba({CLEAR});
-            }}
-            
-            QCheckBox {{
-                color: {config["UNCHECKED_TEXT"]};
-                background: rgba({CLEAR});
-                spacing: 0px;
-                padding: 1px;
-                margin: 0px;
-            }}
-            
-            QCheckBox::indicator {{
-                margin: 0px;
-                padding: 0px;
             }}
         """)
         
