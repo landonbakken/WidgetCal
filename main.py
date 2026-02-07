@@ -165,6 +165,8 @@ class NoteWidget(QWidget):
         self.editor.setAcceptRichText(False)   # plain text only
         self.editor.setWordWrapMode(QTextOption.WordWrap)
         self.editor.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.editor.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.editor.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.editor.setPlainText(text)
         
         self.editor.focusInEvent = self.startEditing
