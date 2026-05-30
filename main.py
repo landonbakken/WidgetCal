@@ -1,7 +1,6 @@
 import sys
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QFileSystemWatcher
-from utils import updateInstanceOnly, loadConfig, CONFIG_FILE
+from utils import updateInstanceOnly, loadConfig
 from app_window import WeeklyWidget
 
 def main():
@@ -9,18 +8,10 @@ def main():
     loadConfig()
 
     app = QApplication(sys.argv)
+    app.dragged_task = None
+    
     w = WeeklyWidget()
     w.show()
-
-    # Attach watcher to window instance so it is not garbage collected
-    w.watcher = QFileSystemWatcher()
-    w.watcher.addPath(str(CONFIG_FILE))
-    
-    def on_config_changed(path):
-        loadConfig()
-        w.updateConfig()
-        
-    w.watcher.fileChanged.connect(on_config_changed)
 
     sys.exit(app.exec())
 
