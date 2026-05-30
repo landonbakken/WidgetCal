@@ -38,6 +38,21 @@ class NoteWidget(QWidget):
         self.parent_widget.saveNotes()
         QTextEdit.focusOutEvent(self.editor, event)
 
+class LeftAlignedLineEdit(QLineEdit):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._initialized = False
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if not self._initialized and self.width() > 0:
+            self._initialized = True
+            self.setCursorPosition(0)
+
+    def focusOutEvent(self, event):
+        super().focusOutEvent(event)
+        self.setCursorPosition(0)
+
 class TaskWidget(QWidget):
     def __init__(self, parent, description, done, col_name, new=False):
         super().__init__()
@@ -49,13 +64,13 @@ class TaskWidget(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        
+       
         frame = QFrame()
         frameLayout = QHBoxLayout(frame)
         frameLayout.setContentsMargins(0, 0, 0, 0)
         frameLayout.setSpacing(2)
         layout.addWidget(frame)
-        
+       
         self.dragHandle = QLabel("⋮")
         self.dragHandle.setStyleSheet("color: rgba(100, 100, 100, 150); font-weight: bold;")
         self.dragHandle.setCursor(Qt.OpenHandCursor)
@@ -66,19 +81,18 @@ class TaskWidget(QWidget):
         self.checkbox.stateChanged.connect(self.updateChecked)
         frameLayout.addWidget(self.checkbox)
 
-        self.editor = QLineEdit(self.description)
+        self.editor = LeftAlignedLineEdit(self.description)
         self.editor.setFrame(False)
         self.editor.setStyleSheet("background: transparent;")
         self.editor.editingFinished.connect(self.finishEdit)
         frameLayout.addWidget(self.editor)
-        
+       
         self.deleteButton = QPushButton("X")
         self.deleteButton.clicked.connect(self.deleteTask)
         frameLayout.addWidget(self.deleteButton)
 
         self.updateStylesheet()
         if new:
-            # Let the window finish rendering, then auto-focus the new line edit
             QTimer.singleShot(0, self.editor.setFocus)
 
     def mousePressEvent(self, event):
@@ -89,7 +103,7 @@ class TaskWidget(QWidget):
     def mouseMoveEvent(self, event):
         if not (event.buttons() & Qt.LeftButton): return
         if (event.position().toPoint() - self.drag_start_position).manhattanLength() < QApplication.startDragDistance(): return
-        
+       
         QApplication.instance().dragged_task = self
         drag = QDrag(self)
         mime = QMimeData()
@@ -100,7 +114,7 @@ class TaskWidget(QWidget):
     def finishEdit(self):
         self.description = self.editor.text()
         self.parent_widget.saveTasks()
-    
+   
     def deleteTask(self):
         self.parent_widget.removeTask(self, self.col_name)
 
@@ -128,12 +142,13 @@ class TaskWidget(QWidget):
                 QCheckBox {{ spacing: 0px; padding: 1px; margin: 0px; }}
                 QCheckBox::indicator {{ margin: 0px; padding: 0px; }}
             """)
-            
+           
     def toData(self):
         return {
             "Description": self.description,
             "Done": self.done
         }
+
 
 class TaskListContainer(QWidget):
     def __init__(self, parent, col_name):
